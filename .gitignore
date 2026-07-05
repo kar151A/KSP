@@ -1,13 +1,28 @@
+# Backend
 backend/venv/
+backend/__pycache__/
+
+# Frontend
 frontend/node_modules/
 frontend/dist/
 
+# Environment
 .env
 .env.*
+backend/.env
+frontend/.env
 
-__pycache__/
+# Python
 *.py[cod]
-*.sqlite3
+__pycache__/
+.pytest_cache/
 
+# OS
 .DS_Store
 Thumbs.db
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
