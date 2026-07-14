@@ -16,15 +16,9 @@ class DatabaseManager:
                     command_timeout=15.0,  # Fails gracefully if AWS doesn't respond in 15 seconds
                     timeout=30.0           # Connection allocation timeout threshold
                 )
-<<<<<<< HEAD
                 print("AWS RDS Connection Pool established successfully.")
             except Exception as e:
                 print(f"Failed to connect to AWS RDS: {str(e)}")
-=======
-                print("✅ AWS RDS Connection Pool established successfully.")
-            except Exception as e:
-                print(f"❌ Failed to connect to AWS RDS: {str(e)}")
->>>>>>> 12e966a91e5528a776ed9e50519ef03efc94a81c
                 raise e
 
     async def close_pool(self):
