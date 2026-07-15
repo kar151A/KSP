@@ -21,6 +21,7 @@ import remarkGfm from "remark-gfm";
 import { useFilters } from "../lib/filters-store";
 import type { ChatSession } from "../types/ksp";
 import { ResponseCard } from "../components/shared/ResponseCards";
+import { apiUrl } from "../lib/api";
 
 type Message = {
   id: string;
@@ -98,7 +99,7 @@ export default function AICrimeAssistant() {
           timestamp: new Date().toLocaleTimeString(),
         };
 
-        const res = await fetch("http://localhost:8085/api/v1/chat/query", {
+        const res = await fetch(apiUrl("/api/v1/chat/query"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
