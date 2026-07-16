@@ -15,6 +15,7 @@ import {
   Bot,
   Cpu,
   RefreshCcw,
+  FileText,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,6 +23,7 @@ import { useFilters } from "../lib/filters-store";
 import type { ChatSession } from "../types";
 import { ResponseCard } from "../components/shared/ResponseCards";
 import { apiUrl } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 type Message = {
   id: string;
@@ -61,6 +63,7 @@ Try one of the suggested prompts below, or type your own query.`,
 };
 
 export default function AICrimeAssistant() {
+  const { user } = useAuth();
   const filters = useFilters();
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     return localStorage.getItem("ksp_active_session_id") || "s1";
@@ -224,6 +227,398 @@ export default function AICrimeAssistant() {
     setLoading(false);
   };
 
+  const handleExportPDF = () => {
+    const activeSessionTitle = activeSession?.title || "AI Case Investigation";
+    const currentDate = new Date().toLocaleDateString("en-IN", {
+      dateStyle: "long"
+    }) + " " + new Date().toLocaleTimeString("en-IN", { timeStyle: "short" });
+    
+    const officerName = user?.username || "Inspector";
+    const officerBadge = user?.badgeNumber || "Badge: KSP-5590";
+    const officerRole = user?.role || "Active Officer";
+    
+    let chatHtml = "";
+    messages.forEach((msg, idx) => {
+      if (idx === 0) return;
+      
+      const isUser = msg.role === "user";
+      const sender = isUser ? "Officer Inquiry" : "Intelligence System (AI)";
+      const contentClass = isUser ? "user-msg" : "ai-msg";
+      
+      let text = msg.content || "";
+      text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      text = text.replace(/\n/g, '<br />');
+
+      chatHtml += `
+        <div class="message-block ${contentClass}">
+          <div class="message-header">
+            <span class="sender-title">${sender}</span>
+            <span class="message-time">${msg.timestamp || ""}</span>
+          </div>
+          <div class="message-content">
+            ${text}
+          </div>
+      `;
+
+      if (msg.cardType === "table" && msg.cardData) {
+        const headers = msg.cardData.headers || [];
+        const rows = msg.cardData.rows || [];
+        chatHtml += `
+          <div class="report-table-wrapper">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  ${headers.map(h => `<th>${h}</th>`).join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(row => `
+                  <tr>
+                    ${row.map(cell => `<td>${cell}</td>`).join("")}
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (msg.cardType === "heatmap" && msg.cardData) {
+        chatHtml += `
+          <div class="meta-box font-mono">
+            <strong>Geographic Hotspot Context:</strong><br/>
+            Center: ${JSON.stringify(msg.cardData.center)} | Intensity: ${msg.cardData.intensity} | Patrols Recommended: ${msg.cardData.recommendedPatrols}
+          </div>
+        `;
+      } else if (msg.cardType === "network" && msg.cardData) {
+        chatHtml += `
+          <div class="meta-box font-mono">
+            <strong>Criminal Network Context:</strong><br/>
+            Nodes: ${msg.cardData.nodes?.join(", ")}<br/>
+            Relationships: ${msg.cardData.edges?.map(e => `${e[0]} to ${e[1]} (${e[2]})`).join(" | ")}
+          </div>
+        `;
+      }
+
+      chatHtml += `</div>`;
+    });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>KSP Crime Intelligence Synthesis Report</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono&display=swap');
+            
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            
+            body {
+              font-family: 'Inter', sans-serif;
+              color: #1e293b;
+              background: #ffffff;
+              margin: 0;
+              padding: 0;
+              line-height: 1.6;
+              font-size: 13px;
+            }
+            
+            /* Cover Page */
+            .cover-page {
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              page-break-after: always;
+              padding: 40px;
+              box-sizing: border-box;
+              border: 8px double #1e3e62;
+            }
+            
+            .cover-header {
+              text-align: center;
+              margin-top: 40px;
+            }
+            
+            .ksp-emblem {
+              font-size: 48px;
+              color: #1e3e62;
+              margin-bottom: 10px;
+              font-weight: 800;
+              letter-spacing: 2px;
+            }
+            
+            .cover-subtitle {
+              font-size: 14px;
+              text-transform: uppercase;
+              letter-spacing: 3px;
+              color: #64748b;
+              font-weight: 600;
+            }
+            
+            .cover-title-box {
+              text-align: center;
+              margin: auto 0;
+            }
+            
+            .cover-title {
+              font-size: 32px;
+              font-weight: 800;
+              color: #0f172a;
+              letter-spacing: -0.5px;
+              line-height: 1.2;
+              margin-bottom: 15px;
+              text-transform: uppercase;
+            }
+            
+            .cover-divider {
+              width: 120px;
+              height: 4px;
+              background: #e11d48;
+              margin: 20px auto;
+            }
+            
+            .classification-badge {
+              display: inline-block;
+              border: 2px solid #e11d48;
+              color: #e11d48;
+              padding: 6px 16px;
+              font-weight: 700;
+              font-family: 'JetBrains Mono', monospace;
+              letter-spacing: 3px;
+              font-size: 12px;
+              margin-top: 10px;
+              text-transform: uppercase;
+            }
+            
+            .cover-footer {
+              margin-bottom: 40px;
+              border-top: 2px solid #e2e8f0;
+              padding-top: 20px;
+            }
+            
+            .metadata-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              font-size: 11px;
+              color: #475569;
+            }
+            
+            .meta-item strong {
+              color: #0f172a;
+            }
+            
+            /* Report Content */
+            .content-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 10px;
+              margin-bottom: 30px;
+            }
+            
+            .content-header h2 {
+              margin: 0;
+              font-size: 16px;
+              color: #0f172a;
+              font-weight: 800;
+              text-transform: uppercase;
+            }
+            
+            .message-block {
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            
+            .message-header {
+              display: flex;
+              justify-content: space-between;
+              border-bottom: 1px solid #e2e8f0;
+              padding-bottom: 4px;
+              margin-bottom: 8px;
+            }
+            
+            .sender-title {
+              font-weight: 700;
+              font-size: 12px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              color: #1e3e62;
+            }
+            
+            .message-time {
+              font-size: 11px;
+              color: #94a3b8;
+            }
+            
+            .user-msg .sender-title {
+              color: #475569;
+            }
+            
+            .message-content {
+              font-size: 13px;
+              color: #334155;
+              text-align: justify;
+            }
+            
+            /* Table Styles */
+            .report-table-wrapper {
+              margin-top: 15px;
+              margin-bottom: 15px;
+              overflow-x: auto;
+            }
+            
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11px;
+            }
+            
+            .report-table th {
+              background: #f1f5f9;
+              color: #0f172a;
+              font-weight: 700;
+              padding: 8px;
+              border: 1px solid #cbd5e1;
+              text-align: left;
+            }
+            
+            .report-table td {
+              padding: 8px;
+              border: 1px solid #cbd5e1;
+              color: #334155;
+            }
+            
+            .report-table tr:nth-child(even) td {
+              background: #f8fafc;
+            }
+            
+            .meta-box {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              padding: 10px;
+              border-radius: 6px;
+              margin-top: 12px;
+              font-size: 11px;
+              color: #475569;
+            }
+            
+            .sign-off-section {
+              margin-top: 60px;
+              display: flex;
+              justify-content: space-between;
+              page-break-inside: avoid;
+            }
+            
+            .signature-box {
+              width: 200px;
+              text-align: center;
+              border-top: 1px solid #94a3b8;
+              padding-top: 8px;
+              font-size: 11px;
+              color: #475569;
+            }
+            
+            .official-stamp {
+              width: 120px;
+              height: 120px;
+              border: 2px dashed #94a3b8;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 9px;
+              font-weight: 700;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              transform: rotate(-15deg);
+            }
+            
+            @media print {
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          
+          <!-- Cover Page -->
+          <div class="cover-page">
+            <div class="cover-header">
+              <div class="ksp-emblem">KA - POLICE</div>
+              <div class="cover-subtitle">Karnataka State Police Department</div>
+              <div class="cover-subtitle">State Intelligence Directorate</div>
+            </div>
+            
+            <div class="cover-title-box">
+              <div class="classification-badge">Secret // Internal Use Only</div>
+              <h1 class="cover-title">Crime Intelligence Synthesis Report</h1>
+              <div class="cover-subtitle" style="font-size:12px; margin-top: 10px;">Subject: ${activeSessionTitle}</div>
+              <div class="cover-divider"></div>
+            </div>
+            
+            <div class="cover-footer">
+              <div class="metadata-grid">
+                <div class="meta-item">
+                  <strong>Prepared By:</strong><br/>
+                  ${officerName} (${officerRole})<br/>
+                  ${officerBadge}
+                </div>
+                <div class="meta-item" style="text-align: right;">
+                  <strong>Date generated:</strong><br/>
+                  ${currentDate}<br/>
+                  <strong>Node Server Status:</strong> Secure
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Main Content -->
+          <div style="padding: 40px; box-sizing: border-box;">
+            <div class="content-header">
+              <h2>Investigation Dossier & Query History</h2>
+              <div style="font-size: 10px; color: #64748b; font-family: 'JetBrains Mono';">CASE_REF: ${activeSession?.id || "N/A"}</div>
+            </div>
+            
+            ${chatHtml}
+            
+            <!-- Sign-Off Block -->
+            <div class="sign-off-section">
+              <div class="signature-box">
+                <strong>${officerName}</strong><br/>
+                Reporting Officer Signature
+              </div>
+              
+              <div class="official-stamp">
+                Official Stamp
+              </div>
+              
+              <div class="signature-box">
+                <strong>State Intelligence Board</strong><br/>
+                Countersigning Authority
+              </div>
+            </div>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden" style={{ background: "#f8fafc" }}>
 
@@ -356,12 +751,20 @@ export default function AICrimeAssistant() {
               </div>
             </div>
           </div>
-          <button
-            onClick={launchNewSession}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-all font-mono"
-          >
-            <RefreshCcw className="h-3.5 w-3.5" /> New Chat
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-1.5 text-xs text-[#008DDA] hover:text-[#0069c2] px-3 py-1.5 rounded-lg bg-blue-50/80 border border-blue-100 hover:bg-blue-100 transition-all font-mono font-bold"
+            >
+              <FileText className="h-3.5 w-3.5" /> Export PDF Report
+            </button>
+            <button
+              onClick={launchNewSession}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-all font-mono"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" /> New Chat
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
