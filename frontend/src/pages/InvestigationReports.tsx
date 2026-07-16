@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Share2, Plus, Filter, Search, Loader2, FileSpreadsheet } from "lucide-react";
+import { Download, Share2, Plus, Filter, Search, Loader2, FileSpreadsheet, FileText } from "lucide-react";
 import { getFIRsByDistrict, getFIRsByCrimeGroup } from "../lib/fir-queries";
 import { useFilters } from "../lib/filters-store";
 import { GlobalFilters } from "../components/dashboard/GlobalFilters";
+import { useAuth } from "../context/AuthContext";
 
 function downloadCsv(rows: Array<Record<string, unknown>>, name: string) {
   if (!rows.length) return;
@@ -20,6 +21,7 @@ function downloadCsv(rows: Array<Record<string, unknown>>, name: string) {
 }
 
 export default function InvestigationReports() {
+  const { user } = useAuth();
   const filters = useFilters();
   const f = { years: filters.years, districts: filters.districts, crimeGroups: filters.crimeGroups, firStages: filters.firStages };
   const [query, setQuery] = useState("");
@@ -40,6 +42,349 @@ export default function InvestigationReports() {
       };
     })
     .filter((r) => !query || r.district.toLowerCase().includes(query.toLowerCase()) || r.id.includes(query));
+
+  const downloadPdf = (r: typeof rows[0]) => {
+    const currentDate = new Date().toLocaleDateString("en-IN", {
+      dateStyle: "long"
+    }) + " " + new Date().toLocaleTimeString("en-IN", { timeStyle: "short" });
+    
+    const officerName = user?.username || "Inspector";
+    const officerBadge = user?.badgeNumber || "Badge: KSP-5590";
+    const officerRole = user?.role || "Active Officer";
+    
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>KSP District Profile - ${r.district}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono&display=swap');
+            
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            
+            body {
+              font-family: 'Inter', sans-serif;
+              color: #1e293b;
+              background: #ffffff;
+              margin: 0;
+              padding: 0;
+              line-height: 1.6;
+              font-size: 13px;
+            }
+            
+            /* Cover Page */
+            .cover-page {
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              page-break-after: always;
+              padding: 40px;
+              box-sizing: border-box;
+              border: 8px double #1e3e62;
+            }
+            
+            .cover-header {
+              text-align: center;
+              margin-top: 40px;
+            }
+            
+            .ksp-emblem {
+              font-size: 48px;
+              color: #1e3e62;
+              margin-bottom: 10px;
+              font-weight: 800;
+              letter-spacing: 2px;
+            }
+            
+            .cover-subtitle {
+              font-size: 14px;
+              text-transform: uppercase;
+              letter-spacing: 3px;
+              color: #64748b;
+              font-weight: 600;
+            }
+            
+            .cover-title-box {
+              text-align: center;
+              margin: auto 0;
+            }
+            
+            .cover-title {
+              font-size: 28px;
+              font-weight: 800;
+              color: #0f172a;
+              letter-spacing: -0.5px;
+              line-height: 1.2;
+              margin-bottom: 15px;
+              text-transform: uppercase;
+            }
+            
+            .cover-divider {
+              width: 120px;
+              height: 4px;
+              background: #e11d48;
+              margin: 20px auto;
+            }
+            
+            .classification-badge {
+              display: inline-block;
+              border: 2px solid #e11d48;
+              color: #e11d48;
+              padding: 6px 16px;
+              font-weight: 700;
+              font-family: 'JetBrains Mono', monospace;
+              letter-spacing: 3px;
+              font-size: 12px;
+              margin-top: 10px;
+              text-transform: uppercase;
+            }
+            
+            .cover-footer {
+              margin-bottom: 40px;
+              border-top: 2px solid #e2e8f0;
+              padding-top: 20px;
+            }
+            
+            .metadata-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              font-size: 11px;
+              color: #475569;
+            }
+            
+            .meta-item strong {
+              color: #0f172a;
+            }
+            
+            /* Report Content */
+            .content-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 10px;
+              margin-bottom: 30px;
+            }
+            
+            .content-header h2 {
+              margin: 0;
+              font-size: 16px;
+              color: #0f172a;
+              font-weight: 800;
+              text-transform: uppercase;
+            }
+            
+            .report-section {
+              margin-bottom: 30px;
+            }
+            
+            .section-title {
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              color: #1e3e62;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 4px;
+              margin-bottom: 12px;
+              letter-spacing: 1px;
+            }
+            
+            /* KPI cards */
+            .kpi-row {
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 15px;
+              margin-bottom: 25px;
+            }
+            
+            .kpi-card {
+              border: 1px solid #e2e8f0;
+              background: #f8fafc;
+              padding: 15px;
+              border-radius: 8px;
+              text-align: center;
+            }
+            
+            .kpi-label {
+              font-size: 10px;
+              text-transform: uppercase;
+              color: #64748b;
+              font-weight: 600;
+              margin-bottom: 4px;
+            }
+            
+            .kpi-value {
+              font-size: 20px;
+              font-weight: 800;
+              color: #0f172a;
+              font-family: 'JetBrains Mono', monospace;
+            }
+            
+            .recommendation-list {
+              padding-left: 20px;
+              margin: 0;
+            }
+            
+            .recommendation-list li {
+              margin-bottom: 8px;
+              color: #334155;
+            }
+            
+            .sign-off-section {
+              margin-top: 60px;
+              display: flex;
+              justify-content: space-between;
+              page-break-inside: avoid;
+            }
+            
+            .signature-box {
+              width: 200px;
+              text-align: center;
+              border-top: 1px solid #94a3b8;
+              padding-top: 8px;
+              font-size: 11px;
+              color: #475569;
+            }
+            
+            .official-stamp {
+              width: 120px;
+              height: 120px;
+              border: 2px dashed #94a3b8;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 9px;
+              font-weight: 700;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              transform: rotate(-15deg);
+            }
+          </style>
+        </head>
+        <body>
+          
+          <!-- Cover Page -->
+          <div class="cover-page">
+            <div class="cover-header">
+              <div class="ksp-emblem">KA - POLICE</div>
+              <div class="cover-subtitle">Karnataka State Police Department</div>
+              <div class="cover-subtitle">State Intelligence Directorate</div>
+            </div>
+            
+            <div class="cover-title-box">
+              <div class="classification-badge">Confidential</div>
+              <h1 class="cover-title">District Crime Intelligence Dossier</h1>
+              <div class="cover-subtitle" style="font-size:12px; margin-top: 10px;">Subject: Crime Profile for ${r.district} District</div>
+              <div class="cover-divider"></div>
+            </div>
+            
+            <div class="cover-footer">
+              <div class="metadata-grid">
+                <div class="meta-item">
+                  <strong>Prepared By:</strong><br/>
+                  ${officerName} (${officerRole})<br/>
+                  ${officerBadge}
+                </div>
+                <div class="meta-item" style="text-align: right;">
+                  <strong>Dossier ID:</strong> ${r.id}<br/>
+                  <strong>Date generated:</strong><br/>
+                  ${currentDate}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Main Content -->
+          <div style="padding: 40px; box-sizing: border-box;">
+            <div class="content-header">
+              <h2>District Crime Profile Analysis</h2>
+              <div style="font-size: 10px; color: #64748b; font-family: 'JetBrains Mono';">REPORT_REF: ${r.id}</div>
+            </div>
+            
+            <!-- Section 1: Stats -->
+            <div class="report-section">
+              <div class="section-title">Section I: Executive Operational Metrics</div>
+              <div class="kpi-row">
+                <div class="kpi-card">
+                  <div class="kpi-label">Registered FIRs</div>
+                  <div class="kpi-value">${r.fir_count.toLocaleString()}</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">Primary Crime Category</div>
+                  <div class="kpi-value" style="font-size: 13px; margin-top: 5px;">${r.top_crime}</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">District Risk Rating</div>
+                  <div class="kpi-value" style="color: ${r.status === 'Critical' ? '#e11d48' : r.status === 'Active' ? '#d97706' : '#059669'}; font-size: 18px;">
+                    ${r.status.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Section 2: Evaluation -->
+            <div class="report-section">
+              <div class="section-title">Section II: Intelligence Analysis</div>
+              <p style="color: #334155; text-align: justify; font-size: 12.5px;">
+                An analytical review of crime data indicates that the district of <strong>${r.district}</strong> is currently categorized under a <strong>${r.status}</strong> alert status, based on a cumulative registry of <strong>${r.fir_count.toLocaleString()}</strong> FIR incidents. 
+                The predominant operational challenge in this jurisdiction relates to <strong>${r.top_crime}</strong> cases, which account for a significant portion of local law enforcement response.
+              </p>
+            </div>
+            
+            <!-- Section 3: Recommendations -->
+            <div class="report-section">
+              <div class="section-title">Section III: Recommended Security Protocols</div>
+              <ul class="recommendation-list" style="font-size: 12.5px;">
+                ${r.status === 'Critical' ? `
+                  <li>Deploy additional static police presence at high-density hot zones immediately.</li>
+                  <li>Increase joint patrol cycles by 25% across the district sub-divisions.</li>
+                  <li>Initiate targeted localized task force investigations into major crime hubs.</li>
+                  <li>Conduct weekly precinct-level coordination briefings with State Intelligence.</li>
+                ` : r.status === 'Active' ? `
+                  <li>Maintain scheduled mobile patrols and active intelligence monitoring.</li>
+                  <li>Analyze hot spot shift patterns and re-allocate resources bi-weekly.</li>
+                  <li>Engage in community-based crime prevention initiatives in moderate-risk neighborhoods.</li>
+                  <li>Perform monthly review of pending investigation backlogs.</li>
+                ` : `
+                  <li>Continue standard preventive patrol grids.</li>
+                  <li>Update general crime log files on a weekly routine schedule.</li>
+                  <li>Maintain routine check-ins with local community leaders.</li>
+                  <li>Review baseline indices quarterly.</li>
+                `}
+              </ul>
+            </div>
+            
+            <!-- Sign-Off Block -->
+            <div class="sign-off-section">
+              <div class="signature-box">
+                <strong>${officerName}</strong><br/>
+                Reporting Officer Signature
+              </div>
+              
+              <div class="official-stamp">
+                Official Stamp
+              </div>
+              
+              <div class="signature-box">
+                <strong>Karnataka State Police</strong><br/>
+                State Intelligence Board
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   return (
     <div className="p-6 md:p-8 space-y-5 overflow-y-auto h-[calc(100vh-3.5rem)]">
@@ -111,9 +456,14 @@ export default function InvestigationReports() {
                   </td>
                   <td className="p-3 text-right space-x-1">
                     <button
+                      onClick={() => downloadPdf(r)}
+                      className="inline-flex p-1.5 border rounded hover:bg-gray-50 text-blue-600 hover:border-blue-400"
+                      title="Download PDF Dossier"
+                    ><FileText className="h-3.5 w-3.5" /></button>
+                    <button
                       onClick={() => downloadCsv([r], r.id)}
                       className="inline-flex p-1.5 border rounded hover:bg-gray-50 text-gray-600"
-                      title="Download"
+                      title="Export CSV"
                     ><Download className="h-3.5 w-3.5" /></button>
                     <button className="inline-flex p-1.5 border rounded hover:bg-gray-50 text-gray-600" title="Share">
                       <Share2 className="h-3.5 w-3.5" />
