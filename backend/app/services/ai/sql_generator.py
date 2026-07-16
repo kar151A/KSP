@@ -1,15 +1,13 @@
 import os
 import re
-from dotenv import load_dotenv
 from google import genai
-
-load_dotenv()
+from app.config.settings import settings
 
 
 class SQLGenerator:
     def __init__(self):
         self.client = genai.Client(
-            api_key=os.getenv("GEMINI_API_KEY")
+            api_key=settings.GEMINI_API_KEY
         )
 
     def generate_query_string(self, user_query: str, schema: str) -> str:
@@ -94,7 +92,7 @@ USER QUESTION:
 """
 
         response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash",
             contents=prompt
         )
 
@@ -136,7 +134,7 @@ Return ONLY SQL.
 """
 
         response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash",
             contents=prompt
         )
 
